@@ -1,6 +1,9 @@
 import requests
 import csv
 from datetime import datetime
+import os
+import argparse
+from dotenv import load_dotenv
 
 def get_vulnerabilities(repos, github_token):
     headers = {
@@ -154,7 +157,7 @@ def get_repositories(github_token, organization, prefix):
         if not repositories:
             break
             
-        github_repos = [f"{organization}/{repo['name']}" for repo in repositories if prefix && prefix in repo['name'].lower()]
+        github_repos = [f"{organization}/{repo['name']}" for repo in repositories if not prefix or (prefix and prefix in repo['name'].lower())]
         repos.extend(github_repos)
         
         page += 1
@@ -162,18 +165,30 @@ def get_repositories(github_token, organization, prefix):
     return repos
 
 def main():
-    # Token de acesso do GitHub
-    github_token = ''
-    organization = ''
-    prefix = ''
-
+    # Carregar variáveis de ambiente do arquivo .env
+    load_dotenv()
+    
+    # Configurar parser de argumentos
+    parser = argparse.ArgumentParser(description='Busca vulnerabilidades em repositórios GitHub.')
+    parser.add_argument('--token', help='Token de acesso do GitHub', default=os.getenv('GITHUB_TOKEN'))
+    parser.add_argument('--org', help='Nome da organização no GitHub', default=os.getenv('GITHUB_ORG'))
+    parser.add_argument('--prefix', help='Prefixo para filtrar repositórios', default=os.getenv('REPO_PREFIX', ''))
+    
+    args = parser.parse_args()
+    
+    # Verificar se token e organização foram fornecidos
+    if not args.token:
+        raise ValueError('Token do GitHub não fornecido. Use --token ou defina a variável de ambiente GITHUB_TOKEN')
+    if not args.org:
+        raise ValueError('Organização não fornecida. Use --org ou defina a variável de ambiente GITHUB_ORG')
+    
     print('Buscando repositórios...')
-    repos = get_repositories(github_token, organization, prefix)
+    repos = get_repositories(args.token, args.org, args.prefix)
     print(f'Encontrados {len(repos)} repositórios')
     
     # Obter vulnerabilidades
     print('Buscando vulnerabilidades...')
-    vulnerabilities = get_vulnerabilities(repos, github_token)
+    vulnerabilities = get_vulnerabilities(repos, args.token)
     
     # Gerar nome do arquivo com timestamp
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
